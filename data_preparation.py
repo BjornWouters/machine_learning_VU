@@ -1,15 +1,43 @@
-from Bio import SeqIO
+from Bio import SeqIO, SeqUtils
 from googlesearch import search
 import mygene
 import numpy as np
 import pandas as pd
 import re
+import urllib.error
 import urllib.request
 
 
 def read_data(data_file):
     df = pd.read_csv(data_file)
     return df
+
+
+def create_columns(df):
+    amino_acids = ['Gly', 'Ala', 'Val', 'Leu', 'Ile',
+                   'Pro', 'Phe', 'Tyr', 'Trp', 'Ser',
+                   'Thr', 'Cys', 'Met', 'Asn', 'Gln',
+                   'Lys', 'Arg', 'His', 'Asp', 'Glu',
+                   'Stop']
+    for aa in amino_acids:
+        df['C_'+aa] = 0
+        df['M_'+aa] = 0
+
+    variations = df.Variation.tolist()
+    regular_expression = re.compile('^[a-zA-Z ]+$')
+    # Just for interpretation purpose
+    filtered_variation = set(filter(regular_expression.match,
+                                    variations))
+
+    interesting_variation = ['Truncating Mutations',
+                             'Deletion', 'Amplification',
+                             'Fusions']
+
+    for varation in interesting_variation:
+        df[varation] = 0
+
+    df['from_start'] = np.nan
+    df['from_end'] = np.nan
 
 
 def retrieve_uniprot_identifier(hgnc_symbol):
@@ -29,27 +57,56 @@ def fetch_protein_info(gene):
     return record
 
 
-def assign_mutation_location(df, protein_record, gene):
-    df['from_start'] = np.nan
-    df['from_end'] = np.nan
+def assign_mutation_location(df, index, protein_record, gene):
     sequence_length = len(protein_record.seq)
-    variation = df.loc[gene].Variation
-    if variation.size > 1:
+    variation = df.loc[index].Variation
 
-    mutation_index = re.findall(r'\d+', variation)
-    if mutation_index:
-        df.at[gene, 'from_start'] = mutation_index
-        df.at[gene, 'from_end'] = sequence_length - mutation_index
+    has_index = re.findall(r'\d+', variation)
+    if has_index:
+        mutation_index = int(has_index[0])
+        df.at[index, 'from_start'] = int(mutation_index)
+        df.at[index, 'from_end'] = int(sequence_length - mutation_index)
+        aa_change = list(variation)
+
+        try:
+            control = SeqUtils.IUPACData.protein_letters_1to3[aa_change[0]]
+            df.at[index, 'C_'+control] = 1
+        except KeyError:
+            if aa_change[0] == '*':
+                df.at[index, 'C_Stop'] = 1
+        try:
+            mutation = SeqUtils.IUPACData.protein_letters_1to3[aa_change[-1]]
+            df.at[index, 'M_'+mutation] = 1
+        except KeyError:
+            if aa_change[-1] == '*':
+                df.at[index, 'M_Stop'] = 1
+
+    elif variation in ['Truncating Mutations', 'Deletion',
+                       'Amplification', 'Fusions']:
+        df.at[index, variation] = 1
 
 
 def main():
     data_file = 'dataset/training_variants'
     df = read_data(data_file)
-    for index, row in df.Gene.iterrows():
-        print('Working on gene: ' + str(indexrr45) + '\n')
-        protein_record = fetch_protein_info(gene)
-        assign_mutation_location(df, protein_record, gene)
-    df.to_csv('output.csv')
+    create_columns(df)
+
+    current_gene = str()
+    for index, row in df.head(10).iterrows():
+        try:
+            gene = row.Gene
+            print('Working on gene: ' + str(gene) + '\n')
+
+            if gene != current_gene:
+                protein_record = fetch_protein_info(gene)
+                current_gene = gene
+
+            assign_mutation_location(df, index, protein_record, gene)
+        except urllib.error.HTTPError:
+            print('No Uniprot info on gene: ' + str(gene) + '\n')
+            continue
+
+    df.to_csv('output_small.csv')
 
 
 if __name__ == '__main__':
