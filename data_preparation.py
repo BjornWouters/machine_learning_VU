@@ -52,12 +52,13 @@ def fetch_protein_info(gene):
     result = mg.query(gene, size=1, species='human')
     hgnc_symbol = result['hits'][0]['symbol']
     uniprot_id = retrieve_uniprot_identifier(hgnc_symbol)
-    data = urllib.request.urlopen("http://www.uniprot.org/uniprot/" + uniprot_id + ".xml")
+    data = urllib.request.urlopen(
+        "http://www.uniprot.org/uniprot/" + uniprot_id + ".xml")
     record = SeqIO.read(data, "uniprot-xml")
     return record
 
 
-def assign_mutation_location(df, index, protein_record, gene):
+def assign_mutation_location(df, index, protein_record):
     sequence_length = len(protein_record.seq)
     variation = df.loc[index].Variation
 
@@ -87,12 +88,12 @@ def assign_mutation_location(df, index, protein_record, gene):
 
 
 def main():
-    data_file = 'dataset/training_variants'
+    data_file = 'dataset/trainingcsv.csv'
     df = read_data(data_file)
     create_columns(df)
 
     current_gene = str()
-    for index, row in df.head(10).iterrows():
+    for index, row in df.iterrows():
         try:
             gene = row.Gene
             print('Working on gene: ' + str(gene) + '\n')
@@ -101,12 +102,15 @@ def main():
                 protein_record = fetch_protein_info(gene)
                 current_gene = gene
 
-            assign_mutation_location(df, index, protein_record, gene)
+            assign_mutation_location(df, index, protein_record)
         except urllib.error.HTTPError:
             print('No Uniprot info on gene: ' + str(gene) + '\n')
             continue
+        except urllib.error.URLError:
+            print('Outdated Uniprot identifier on gene: ' + str(gene) + '\n')
+            continue
 
-    df.to_csv('output_small.csv')
+    df.to_csv('output.csv')
 
 
 if __name__ == '__main__':
