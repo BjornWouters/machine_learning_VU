@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 
 def read_data(data_file):
@@ -41,11 +42,36 @@ def plot_gene_distribution(df):
     plt.legend([df['Gene'].value_counts().head(10)], numpoints=10)
 
 
+def plot_mutation_classification(df):
+    df_freq = pd.DataFrame()
+    for column in df:
+        if column.startswith('M_'): # C_ will show the control
+            series = df.loc[df[column] == 1]['Class'].value_counts()
+            # series.rename(column)
+            df_freq[column] = series
+
+    sns.heatmap(df_freq, annot=True)
+    plt.ylabel('Class')
+    plt.title('Mutation distribution mutated')
+
+
+def plot_mutation_position(df):
+    df.loc[df['Class'] == 7].set_index('Class')\
+        .from_start.dropna().sort_values().plot(kind='bar')
+
+
+    plt.ylabel('Mutation position')
+    plt.xlabel('Gene')
+    plt.title('Mutation position (from start) on class 7')
+
+
 def main():
-    data_file = 'dataset/training_variants'
+    data_file = 'output.csv'
     df = read_data(data_file)
     # plot_class_distribution(df)
-    plot_gene_distribution(df)
+    # plot_gene_distribution(df)
+    # plot_mutation_classification(df)
+    plot_mutation_position(df)
     plt.show()
 
 

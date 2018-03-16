@@ -88,7 +88,7 @@ def assign_mutation_location(df, index, protein_record):
 
 
 def main():
-    data_file = 'dataset/trainingcsv.csv'
+    data_file = 'dataset/stage2_test_variants.csv'
     df = read_data(data_file)
     create_columns(df)
 
@@ -110,7 +110,7 @@ def main():
             print('Outdated Uniprot identifier on gene: ' + str(gene) + '\n')
             continue
 
-    df.to_csv('output.csv')
+    df.to_csv('output_test.csv')
 
 
 if __name__ == '__main__':
